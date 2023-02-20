@@ -20,55 +20,12 @@ used range of the worksheet is read into a pandas dataframe to allow for various
 
 #class Excel: # initially set up as a classed-library; but, this is really just a tkinter app at the moment.  Leave here just in case ever needed again.
 
-    # A traditional way of processing a file using askopenfilename(); this does not just grab the in-focus sheet by default.
-    # This was my initial idea, but I've moved on. New goal is to NOT have the user select the file manually. Please see the index_match_active fuction
-    # which follows this for where this is all headed (i.e. goal is for this all to work with ALREADY-OPEN applications).
-
-
+# Working with the ALREADY-OPEN, active, Excel sheet to create an easier way to run Excel's Index and Match
+# TO-DO
+# () Test Function
+# () Currenly, strings can be read as numbers (i.e. 3 can become 3.0 when carried over)--look into retaining data type.
 
 def index_match():
-
-        root = tk.Tk()
-        root.withdraw()
-        file_path = filedialog.askopenfilename()
-        excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application
-        df = pd.read_excel(file_path, sheet_name='Test') # bY defualt, this only reads the 1st sheet (sheet_name=0, setting to NONE reads all)
-        df = df.fillna('')
-        # replace '.' by '_' 
-        df.columns = df.columns.str.replace('.', '_')
-        headers=df.columns.values.tolist()
-        wb=excel.Workbooks.Open(file_path)
-        #writeData = wb.ActiveSheet
-        writeData = wb.Worksheets('Test')
-        print(headers)
-
-        header_dict={}
-        header_counter=1
-        for names in headers:
-            header_dict.update({names : header_counter})
-            header_counter=header_counter+1
-
-        print(header_dict)
-        # need to ensure that colx values are the header names for pandas
-        col1=input('Choose 1st Column: ')
-        col2=input('Choose 2nd Column: ')
-        col3=input('Choose 3rd Column: ')
-        col4=input('Choose 4th Column: ') # this should be an INT to work with VBA (win32 writeData.cells)
-
-        # Pandas indexing counts start after header row (and starts at 0); because of this first iteration should be index + 2
-
-        for i in df.itertuples(): # iterating the chosen column
-            df2 = df.loc[df[col2]==i[header_dict[col1]]] # creating smaller dataframe where Col2 value = current iteration of Col1 value
-            if len(df2)>0: # it a hit...
-                corrsponding_values=df2[col3].unique()  #...create a unique list of values of the corresponding Col3 data
-                corrsponding_values=corrsponding_values.tolist() #...converting to list
-                writeData.Cells(i.Index + 2, header_dict[col4]).Value = str(corrsponding_values) # writing that list to selected output column (col4)
-                
-        excel.Visible = True # renders the app visible
-
-
-
-def index_match_active():
 
         excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application
 
@@ -87,15 +44,22 @@ def index_match_active():
 
                 # Pandas indexing counts start after header row (and starts at 0); because of this first iteration should be index + 2
 
+                    row_counter=1
                     for i in df.itertuples(): # iterating the chosen column
-                        df2 = df.loc[df[col2]==i[header_dict[col1]]] # creating smaller dataframe where Col2 value = current iteration of Col1 value
+                        df2 = df[df.iloc[:,col2]==str(i[col1+1])] # creating smaller dataframe where Col2 value = current iteration of Col1 value
                         if len(df2)>0: # it a hit...
-                            corrsponding_values=df2[col3].unique()  #...create a unique list of values of the corresponding Col3 data
+                            corrsponding_values=df2.iloc[:,col3].unique()  #...create a unique list of values of the corresponding Col3 data
                             corrsponding_values=corrsponding_values.tolist() #...converting to list
-                            writeData.Cells(i.Index + 2, header_dict[col4]).Value = str(corrsponding_values) # writing that list to selected output column (col4)
-                            
+                            writeData.Cells(row_counter, col4+1).Value = str(corrsponding_values) # writing that list to selected output column (col4)
+                        row_counter=row_counter+1
                     excel.Visible = True # renders the app visible
                     return None
+
+                root = tk.Tk()
+                root.title("Index and Match\t\t")
+                # center root window
+                root.tk.eval(f'tk::PlaceWindow {root._w} center')
+                writeData = excel.ActiveSheet
 
                 df = pd.DataFrame(writeData.UsedRange())    # Creates a pandas dataframe out of the used range of the active excel sheet.  
                 df.columns=df.iloc[0]                       # df is created w/o headers, this coverts first row into a numpy.ndarray to be our headers
@@ -116,12 +80,7 @@ def index_match_active():
 
                 # Create the list of options
                 options_list = headers2
-            
-                root = tk.Tk()
-                root.title("Concatenate\t\t")
-                # center root window
-                root.tk.eval(f'tk::PlaceWindow {root._w} center')
-                writeData = excel.ActiveSheet
+        
 
                 header_dict={}
                 header_counter=1
@@ -160,27 +119,12 @@ def index_match_active():
                 main_menu_button.pack(pady=10)
 
                 root.mainloop()
-
-
-                col1=input('Choose 1st Column: ')
-                col2=input('Choose 2nd Column: ')
-                col3=input('Choose 3rd Column: ')
-                col4=input('Choose 4th Column: ') # this should be an INT to work with VBA (win32 writeData.cells)
-
-                # Pandas indexing counts start after header row (and starts at 0); because of this first iteration should be index + 2
-
-                for i in df.itertuples(): # iterating the chosen column
-                    df2 = df.loc[df[col2]==i[header_dict[col1]]] # creating smaller dataframe where Col2 value = current iteration of Col1 value
-                    if len(df2)>0: # it a hit...
-                        corrsponding_values=df2[col3].unique()  #...create a unique list of values of the corresponding Col3 data
-                        corrsponding_values=corrsponding_values.tolist() #...converting to list
-                        writeData.Cells(i.Index + 2, header_dict[col4]).Value = str(corrsponding_values) # writing that list to selected output column (col4)
                         
                 excel.Visible = True # renders the app visible
 
         except Exception as e:
             print(e)
-            turn_excel_back_on()
+            turn_excel_back_on(excel)
         
 
 
@@ -277,7 +221,7 @@ def concatenate_column_values_active():
 
         except Exception as e:
             print(e)
-            turn_excel_back_on()
+            turn_excel_back_on(excel_object=excel)
     
 
 def compare_columns_active():
@@ -419,6 +363,10 @@ def main_menu():
                 elif choice=='Concatenate Column Values':
                     root.destroy()
                     concatenate_column_values_active()
+
+                elif choice=='Index and Match':
+                    root.destroy()
+                    index_match()
                     
                 else:
                     root.destroy()
@@ -427,7 +375,7 @@ def main_menu():
                 return None
 
             # Create the list of options
-            options_list = ['Compare Two Columns', 'Concatenate Column Values']
+            options_list = ['Compare Two Columns', 'Concatenate Column Values', 'Index and Match']
             
             root = tk.Tk()
             root.title("Res Feci\t\t")
