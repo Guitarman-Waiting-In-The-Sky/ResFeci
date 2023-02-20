@@ -15,6 +15,12 @@ through a tkinter file selection type prompt).  The magic that allows this to ha
 As of 2/19/23, I only have a couple of working (but not entirely tested) Excel features available (Compare Columns and Concatenate Column Row Values). The active worksheet is identified with win32; then, the
 used range of the worksheet is read into a pandas dataframe to allow for various operations.  
 
+2/20/23: Converted Index and Match function into the "active worksheet" model.  It seems to work in a VERY small test run (n=2 :) )---will be tested more. 
+
+This all DEFINITELY needs a lot more testing! Use as-is!!! 
+
+REMEMBER, all macros are permanent (i.e. be sure to save a copy of your report before you run any of this!!!)
+
 
 '''
 
