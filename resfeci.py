@@ -21,8 +21,9 @@ used range of the worksheet is read into a pandas dataframe to allow for various
 #class Excel: # initially set up as a classed-library; but, this is really just a tkinter app at the moment.  Leave here just in case ever needed again.
 
     # A traditional way of processing a file using askopenfilename(); this does not just grab the in-focus sheet by default.
-    # This was my initial idea, but I've moved on. New goal is to NOT have the user select the file manually. 
-    # The goal is to work with an already-open application.
+    # This was my initial idea, but I've moved on. New goal is to NOT have the user select the file manually. Please see the index_match_active fuction
+    # which follows this for where this is all headed (i.e. goal is for this all to work with ALREADY-OPEN applications).
+
 
 
 def index_match():
