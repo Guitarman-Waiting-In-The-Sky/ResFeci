@@ -12,21 +12,18 @@ The ultimate goal here is to create Python-generated macros that interface with 
 interface with these; very few of these appear to offer the option to work with the active, in-focus application (i.e. the paths to files must either be hard-coded or selected 
 through a tkinter file selection type prompt).  The magic that allows this to happen is the win32com library.
 
-As of 2/19/23, I only have a couple of Excel features available (Compare Columns and Concatenate Column Row Values). The active worksheet is identified with win32; then, the
+As of 2/19/23, I only have a couple of working (but not entirely tested) Excel features available (Compare Columns and Concatenate Column Row Values). The active worksheet is identified with win32; then, the
 used range of the worksheet is read into a pandas dataframe to allow for various operations.  
 
-Query as to whether classes are needed here....not really as of yet.  But, you never know.
 
 '''
 
-class Excel:
-
-   
+#class Excel: # initially set up as a classed-library; but, this is really just a tkinter app at the moment.  Leave here just in case ever needed again.
 
     # A traditional way of processing a file using askopenfilename(); this does not just grab the in-focus sheet by default.
     # Left here for now just for examples.
     
-    def index_match():
+def index_match():
 
         root = tk.Tk()
         root.withdraw()
@@ -67,7 +64,7 @@ class Excel:
         excel.Visible = True # renders the app visible
 
 
-    def concatenate_column_values_active():
+def concatenate_column_values_active():
 
         excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application
 
@@ -75,7 +72,7 @@ class Excel:
 
             def return_main_menu():
                 root.destroy()
-                Excel.main_menu()
+                main_menu()
 
             def concatenate():
                 col1=options_list.index(value_col1.get())
@@ -160,12 +157,10 @@ class Excel:
 
         except Exception as e:
             print(e)
-            excel.ScreenUpdating=True
-            excel.Application.Calculation = -4105 # to set xlCalculationManual
-
+            turn_excel_back_on()
     
 
-    def compare_columns_active():
+def compare_columns_active():
 
         '''
         This compares two user-selected columns (from the ACTIVE) Excel Worksheet.  If there are any simliar values between the columns,
@@ -182,7 +177,7 @@ class Excel:
             
             def return_main_menu():
                 root.destroy()
-                Excel.main_menu()
+                main_menu()
 
             def run_comparison():
                 col1=options_list.index(value_col1.get())
@@ -277,17 +272,15 @@ class Excel:
 
         except Exception as e:
             print(e)
-            Excel.turn_excel_back_on(excel_object=excel)
-            #excel.ScreenUpdating=True
-            #excel.Application.Calculation = -4105 # to set xlCalculationManual
+            turn_excel_back_on(excel_object=excel)
 
 
-    def turn_excel_back_on(excel_object):
+def turn_excel_back_on(excel_object):
         excel_object.ScreenUpdating=True
         excel_object.Application.Calculation = -4105 # to set xlCalculationManual
 
 
-    def main_menu():
+def main_menu():
 
         '''
         This is just the main options menu. Pretty basic and just serves to prompt the user for their desired action.
@@ -302,14 +295,14 @@ class Excel:
 
                 if choice=='Compare Two Columns':
                     root.destroy()
-                    Excel.compare_columns_active()
+                    compare_columns_active()
                 elif choice=='Concatenate Column Values':
                     root.destroy()
-                    Excel.concatenate_column_values_active()
+                    concatenate_column_values_active()
                     
                 else:
                     root.destroy()
-                    Excel.main_menu()
+                    main_menu()
         
                 return None
 
@@ -338,8 +331,4 @@ class Excel:
 
 
 if __name__=='__main__':
-    Excel.main_menu()
-
-    # THESE WORK!
-   # Excel.compare_columns_active()
-   # Excel.concatenate_columns_active()
+    main_menu()
