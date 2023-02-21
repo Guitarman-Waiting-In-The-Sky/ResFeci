@@ -5,7 +5,7 @@ A "work in progress" script which allows Windows users to easily run various Pyt
 While there are already plenty of libraries out there that permit the user to interface with Windows applications; very few of them appear to offer
 the option to easily work with the active, CURRENTLY-OPEN, application like this one does (provided you are on Windows).  Generally, the paths 
 to files must either be hard-coded or selected through something like a tkinter file-selection prompt. Instead, this script is designed to be used with 
-an already-open application (there are currently only a few functions for Excel).
+an already-open application (note: there are currently only a few Excel functions avaiable -- more will be added).
 
 The magic that allows my script to work with the in-focus app is the COM component of the pywin32 library (win32com).  For the initial stages, my focus 
 is on Excel. The active worksheet is identified with pywin32; then, the used range of the worksheet is read into a pandas dataframe to allow for more efficient operations.  
