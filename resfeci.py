@@ -7,10 +7,11 @@ from tkinter.simpledialog import askstring
 # Converts Excel Sheet into DataFrame
 import pandas as pd
 
+
 '''
 The ultimate goal here is to create Python-run alternatives to VBA macros that interface with Windows applications. While there are plenty of apps out there that already allow the user to
 interface with these; very few of these appear to offer the option to work with the active, in-focus application (i.e. the paths to files must either be hard-coded or selected 
-through a tkinter file selection type prompt).  The magic that allows this to happen is the win32com library.
+through a tkinter file selection type prompt).  The magic that allows this to happen is the pywin32 library (specifically, its COM component---win32com).
 
 As of 2/19/23, I only have a couple of working (but not entirely tested) Excel features available (Compare Columns and Concatenate Column Row Values). The active worksheet is identified with win32; then, the
 used range of the worksheet is read into a pandas dataframe to allow for various operations.  
@@ -228,9 +229,55 @@ def concatenate_column_values_active():
         except Exception as e:
             print(e)
             turn_excel_back_on(excel_object=excel)
-    
 
-def compare_columns_active():
+
+
+    
+def active_excel_job_complete(job):
+
+    try:
+
+        def return_main_menu():
+            job_compete_window.destroy()
+            main_menu()
+
+        def job_route(job):
+            print(job)
+            job_compete_window.destroy()
+            if job=='comparison':
+                compare_columns_active()
+
+        
+
+        job_compete_window = tk.Tk()
+        job_compete_window.title("Job Complete\t\t")
+            # center root window
+        job_compete_window.tk.eval(f'tk::PlaceWindow {job_compete_window._w} center')
+            #root.withdraw()
+
+        compare_label=tk.Label(job_compete_window, text = 'Job Complete!\n\nHit BACK to run a simliar operation\nor select RETURN TO MAIN')
+        compare_label.pack(padx=100)
+
+
+        if job=='comparison':
+            
+            submit_button = tk.Button(job_compete_window, text='BACK', command= lambda: job_route(job='comparison'))
+        submit_button.pack(pady=10)
+
+        main_menu_button = tk.Button(job_compete_window, text='RETURN TO MAIN', command=return_main_menu)
+        main_menu_button.pack(pady=10)
+
+        job_compete_window.mainloop()
+
+    except Exception as e:
+        print(e)
+       # turn_excel_back_on()
+
+
+
+
+
+def compare_columns_active(**message):
 
         '''
         This compares two user-selected columns (from the ACTIVE) Excel Worksheet.  If there are any simliar values between the columns,
@@ -242,7 +289,19 @@ def compare_columns_active():
         worksheet with win32
         '''
 
-        excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application
+        excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application     
+
+        display_label='standard'  # This is tied to kwarg parameter and controls the user displayed message (i.e. Error message and whatnot)
+
+        for x in message.values():
+            if x == 'same_column':
+                display_label='same_column'
+            elif x == 'unselected_column':
+                display_label='unselected_column'
+            else:
+                display_label='standard'
+
+        
         try:
             
             def return_main_menu():
@@ -250,8 +309,18 @@ def compare_columns_active():
                 main_menu()
 
             def run_comparison():
-                col1=options_list.index(value_col1.get())
-                col2=options_list.index(value_col2.get())
+
+                # Error is thrown if user does not select a Column before hitting SUBMIT.
+                try:
+                    col1=options_list.index(value_col1.get())
+                    col2=options_list.index(value_col2.get())
+                except:
+                    root.destroy()
+                    compare_columns_active(message='unselected_column')
+
+                if col1==col2: # if user selects the same column ask them to try, function should have a message.
+                    root.destroy()
+                    compare_columns_active(message='same_column')
 
                 # Reading selected column row values into lists (which will be compared soon)
                 # Note: ':' selects all rows from the chosen column (index based column chosen with INT as col1, col2)
@@ -291,6 +360,8 @@ def compare_columns_active():
                 excel.ScreenUpdating=True
                 excel.Application.Calculation = -4105 # to set xlCalculationManual
                 #root.destroy()  # remove the tkinter when when done---or leave open for more
+                root.destroy()
+                active_excel_job_complete(job='comparison')
 
                 return None
 
@@ -318,7 +389,15 @@ def compare_columns_active():
             # center root window
             root.tk.eval(f'tk::PlaceWindow {root._w} center')
             #root.withdraw()
-           
+
+            compare_label=tk.Label(root)
+            if display_label=='standard':
+                compare_label=tk.Label(root, text = 'Select the Two Columns to Be Compared\n\nSimilar Values Between the Columns Will be Highlighted')
+            elif display_label=='same_column':
+                compare_label=tk.Label(root, text = 'Please Select More Than 1 Column')
+            elif display_label=='unselected_column':
+                compare_label=tk.Label(root, text = 'Please Select Both Columns')
+            compare_label.pack()
             # Set the default value of the variable
             value_col1 = tk.StringVar(root)
             value_col1.set("  Select 1st Column to Compare  ")
@@ -365,7 +444,7 @@ def main_menu():
 
                 if choice=='Compare Two Columns':
                     root.destroy()
-                    compare_columns_active()
+                    compare_columns_active(message='standard')
                 elif choice=='Concatenate Column Values':
                     root.destroy()
                     concatenate_column_values_active()
