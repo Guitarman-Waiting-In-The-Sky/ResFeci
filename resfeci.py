@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox  # Python 3
 from tkinter.simpledialog import askstring
+import os
 
 # Converts Excel Sheet into DataFrame
 import pandas as pd
@@ -34,7 +35,9 @@ REMEMBER, all macros are permanent (i.e. be sure to save a copy of your report b
 
 def index_match():
 
-        excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application
+        root = tk.Tk()
+        root.title("Index and Match\t\t")
+        root.tk.eval(f'tk::PlaceWindow {root._w} center')
 
         try:
 
@@ -47,7 +50,7 @@ def index_match():
                     col1=options_list.index(value_col1.get())
                     col2=options_list.index(value_col2.get())
                     col3=options_list.index(value_col3.get())
-                    col4=options_list.index(value_col4.get()) # this should be an INT to work with VBA (win32 writeData.cells)
+                    col4=options_list.index(value_col4.get()) # this should be an INT to work with VBA (win32 activeSheet.cells)
 
                 # Pandas indexing counts start after header row (and starts at 0); because of this first iteration should be index + 2
 
@@ -57,18 +60,29 @@ def index_match():
                         if len(df2)>0: # it a hit...
                             corrsponding_values=df2.iloc[:,col3].unique()  #...create a unique list of values of the corresponding Col3 data
                             corrsponding_values=corrsponding_values.tolist() #...converting to list
-                            writeData.Cells(row_counter, col4+1).Value = str(corrsponding_values) # writing that list to selected output column (col4)
+                            output_string='' # converting string to list for readability on output
+                            for x in corrsponding_values:
+                                if output_string=='':
+                                    output_string=str(x) + '|'
+                                else:
+                                    output_string=output_string + str(x) + '|'
+                            output_string = output_string.rstrip(output_string[-1])
+
+                            activeSheet.Cells(row_counter, col4+1).Value = output_string # writing that list to selected output column (col4)
                         row_counter=row_counter+1
                     excel.Visible = True # renders the app visible
-                    return None
+                    
 
-                root = tk.Tk()
-                root.title("Index and Match\t\t")
-                # center root window
-                root.tk.eval(f'tk::PlaceWindow {root._w} center')
-                writeData = excel.ActiveSheet
+                excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application
+                activeSheet = excel.ActiveSheet
 
-                df = pd.DataFrame(writeData.UsedRange())    # Creates a pandas dataframe out of the used range of the active excel sheet.  
+                if activeSheet is None:
+                    del excel
+                    root.destroy()
+                    error_window(message='excel_not_open')
+
+
+                df = pd.DataFrame(activeSheet.UsedRange())    # Creates a pandas dataframe out of the used range of the active excel sheet.  
                 df.columns=df.iloc[0]                       # df is created w/o headers, this coverts first row into a numpy.ndarray to be our headers
                 df = df.fillna('')                          
 
@@ -97,25 +111,25 @@ def index_match():
             
                 # Set the default value of the variable
                 value_col1 = tk.StringVar(root)
-                value_col1.set("  Select the 1st Column to Compare  ")
+                value_col1.set("  Step 1: Select the 1st Column to Be Compared  ")
                 col1_prompt= tk.OptionMenu(root, value_col1, *options_list)
                 col1_prompt.pack(pady=10, padx=100)
 
                 # Set the default value of the variable
                 value_col2 = tk.StringVar(root)
-                value_col2.set("  Select the Column to be Compared Against the 1st Column  ")
+                value_col2.set("  Step 2: Select the Column to be Compared Against the Step 1 Column  ")
                 col2_prompt= tk.OptionMenu(root, value_col2, *options_list)
                 col2_prompt.pack(pady=10, padx=100)
 
                 # Set the default value of the variable
                 value_col3 = tk.StringVar(root)
-                value_col3.set("  Which Column Contains the Data to be Carried Over  ")
+                value_col3.set("  Step 3: Which Column Corresponds with the Step 2 Column and Contains the Data to Copy  ")
                 col3_prompt= tk.OptionMenu(root, value_col3, *options_list)
                 col3_prompt.pack(pady=10, padx=100)
 
                 # Set the default value of the variable
                 value_col4 = tk.StringVar(root)
-                value_col4.set("  Select Column to Place the Extracted Data In  ")
+                value_col4.set("  Step 4: Select Final Column to Place the Copied Step 3 Data Into  ")
                 col4_prompt= tk.OptionMenu(root, value_col4, *options_list)
                 col4_prompt.pack(pady=10, padx=100)
 
@@ -134,10 +148,11 @@ def index_match():
             turn_excel_back_on(excel)
         
 
+def concatenate_column_values_active(**message):
 
-def concatenate_column_values_active():
-
-        excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application
+        root = tk.Tk()
+        root.title("Concatenate\t\t")
+        root.tk.eval(f'tk::PlaceWindow {root._w} center')
 
         try:
 
@@ -173,12 +188,16 @@ def concatenate_column_values_active():
                 w.configure(inactiveselectbackground=w.cget("selectbackground"))
                 w.configure(state="disabled")
                 results.mainloop()
-                #messagebox.showinfo("showinfo", delimited_output_string)
 
+            
+            excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application
+            activeSheet = excel.ActiveSheet
+            if activeSheet is None:
+                del excel
+                root.destroy()
+                error_window(message='excel_not_open')
 
-
-            writeData = excel.ActiveSheet
-            df = pd.DataFrame(writeData.UsedRange())    # Creates a pandas dataframe out of the used range of the active excel sheet.  
+            df = pd.DataFrame(activeSheet.UsedRange())    # Creates a pandas dataframe out of the used range of the active excel sheet.  
             df.columns=df.iloc[0]                       # df is created w/o headers, this coverts first row into a numpy.ndarray to be our headers
             df = df.fillna('')                          
 
@@ -196,11 +215,7 @@ def concatenate_column_values_active():
             # Create the list of options
             options_list = headers2
             
-            root = tk.Tk()
-            root.title("Concatenate\t\t")
-            # center root window
-            root.tk.eval(f'tk::PlaceWindow {root._w} center')
-            #root.withdraw()
+            
            
             # Set the default value of the variable
             value_col1 = tk.StringVar(root)
@@ -231,8 +246,6 @@ def concatenate_column_values_active():
             turn_excel_back_on(excel_object=excel)
 
 
-
-    
 def active_excel_job_complete(job):
 
     try:
@@ -260,7 +273,6 @@ def active_excel_job_complete(job):
 
 
         if job=='comparison':
-            
             submit_button = tk.Button(job_compete_window, text='BACK', command= lambda: job_route(job='comparison'))
         submit_button.pack(pady=10)
 
@@ -273,6 +285,29 @@ def active_excel_job_complete(job):
         print(e)
        # turn_excel_back_on()
 
+
+def error_window(**message):
+
+    def return_main_menu():
+                root.destroy()
+                main_menu()
+
+    root = tk.Tk()
+    root.title("ERROR!!\t\t")
+    root.tk.eval(f'tk::PlaceWindow {root._w} center')
+
+    error_label=tk.Label(root)
+
+    for x in message.values():
+                if x == 'excel_not_open':
+                    error_label=tk.Label(root, text = 'Active Excel Sheet Not Detected\nPlease Open Excel and Try Again')
+
+    error_label.pack(padx=30)
+
+    main_menu_button = tk.Button(root, text='Return to Main', command=return_main_menu)
+    main_menu_button.pack(pady=10)
+
+    root.mainloop()
 
 
 
@@ -289,20 +324,13 @@ def compare_columns_active(**message):
         worksheet with win32
         '''
 
-        excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application     
-
-        display_label='standard'  # This is tied to kwarg parameter and controls the user displayed message (i.e. Error message and whatnot)
-
-        for x in message.values():
-            if x == 'same_column':
-                display_label='same_column'
-            elif x == 'unselected_column':
-                display_label='unselected_column'
-            else:
-                display_label='standard'
-
-        
         try:
+
+            root = tk.Tk()
+            root.title("Compare Columns\t\t")
+            # center root window
+            root.tk.eval(f'tk::PlaceWindow {root._w} center')
+            #root.withdraw()
             
             def return_main_menu():
                 root.destroy()
@@ -346,14 +374,14 @@ def compare_columns_active(**message):
                 for i in df.itertuples(): # itertuples for speed; think of ways to vectorize...
                     # if Col1 row value isn't header and isn't blank, then see if value is in Col2 numpy array, if so, highlight the cell.
                     if i[col1+1] in col2_values and row_counter!=1 and i[col1+1]!='': 
-                        writeData.Cells(row_counter, col1+1).Interior.ColorIndex = 37
+                        activeSheet.Cells(row_counter, col1+1).Interior.ColorIndex = 37
                     row_counter=row_counter+1
 
                 # Repeating the Process to Compare Col2 to Col1 numpy array
                 row_counter=1
                 for i in df.itertuples(): 
                     if i[col2+1] in col1_values and row_counter!=1 and i[col2+1]!='': 
-                        writeData.Cells(row_counter, col2+1).Interior.ColorIndex = 37
+                        activeSheet.Cells(row_counter, col2+1).Interior.ColorIndex = 37
                     row_counter=row_counter+1
 
                 # All Done---Turning Excel back On
@@ -363,40 +391,58 @@ def compare_columns_active(**message):
                 root.destroy()
                 active_excel_job_complete(job='comparison')
 
-                return None
 
-            writeData = excel.ActiveSheet
-            df = pd.DataFrame(writeData.UsedRange())    # Creates a pandas dataframe out of the used range of the active excel sheet.  
+            excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application     
+        
+
+            # *************************************************************************************************************** 
+            # Most of these are for a planned future expansion, for now, I am just playing around with VBA functionality....
+            # Application.ActiveSheet: Returns an object that represents the active sheet (the sheet on top) in the active workbook
+            # or in the specified window or workbook. Returns Nothing if no sheet is active.
+            activeSheet = excel.ActiveSheet
+            if activeSheet is None:
+                del excel
+                root.destroy()
+                error_window(message='excel_not_open')
+
+            #activeWorkbook = excel.ActiveWorkbook
+            #full_path=os.path.join(activeWorkbook.Path, activeWorkbook.Name)
+            # print(activeSheet.Name) returns the name of the active sheet
+            #print(activeWorkbook.Name)
+            #print(full_path)
+            #print(activeSheet.Name)
+            # ********************************************************************************************************************
+            
+
+            df = pd.DataFrame(activeSheet.UsedRange())    # Creates a pandas dataframe out of the used range of the active excel sheet.  
             df.columns=df.iloc[0]                       # df is created w/o headers, this coverts first row into a numpy.ndarray to be our headers
             df = df.fillna('')                          # replacing NaN with nothing because I dont like Nan (not to be confused with naan which is amazing)
            
             headers=df.columns.tolist()
             counter=1
-
-            # Necessary to create a 2nd list because the 1st "headers" may contain duplicately named columns which breaks index()
-            # This ensures clears up confusion by adding ("Column: ")
+            # Necessary to create a 2nd header list because the 1st "headers" may contain duplicately named columns which breaks index()
+            # This ensures every column is unique by adding ("Column: ")
             headers2=[]
-            
             for x in headers:
                 headers2.append(str(x) + ' (Column: ' + str(counter) + ')')
                 counter=counter+1
 
-            # Create the list of options
+            # Create the list of user-presnted options(i.e. the column names with the headers2 suffix)
             options_list = headers2
-            
-            root = tk.Tk()
-            root.title("Compare Columns\t\t")
-            # center root window
-            root.tk.eval(f'tk::PlaceWindow {root._w} center')
-            #root.withdraw()
-
+        
             compare_label=tk.Label(root)
-            if display_label=='standard':
-                compare_label=tk.Label(root, text = 'Select the Two Columns to Be Compared\n\nSimilar Values Between the Columns Will be Highlighted')
-            elif display_label=='same_column':
-                compare_label=tk.Label(root, text = 'Please Select More Than 1 Column')
-            elif display_label=='unselected_column':
-                compare_label=tk.Label(root, text = 'Please Select Both Columns')
+
+            # Message is the kwarg parameter of this function.
+            for x in message.values():
+                if x == 'same_column':
+                    compare_label=tk.Label(root, text = 'Please Select More Than 1 Column')
+                elif x == 'unselected_column':
+                    compare_label=tk.Label(root, text = 'Please Select Both Columns')
+                elif x == 'excel_not_open':
+                    compare_label=tk.Label(root, text = 'Excel Worksheet Not Detected, Please Load and Try Again')
+                else:
+                    compare_label=tk.Label(root, text = 'Select the Two Columns to Be Compared\n\nSimilar Values Between the Columns Will be Highlighted')
+
             compare_label.pack()
             # Set the default value of the variable
             value_col1 = tk.StringVar(root)
@@ -417,7 +463,6 @@ def compare_columns_active(**message):
             main_menu_button.pack(pady=10)
 
             root.mainloop()
-
 
         except Exception as e:
             print(e)
@@ -447,7 +492,7 @@ def main_menu():
                     compare_columns_active(message='standard')
                 elif choice=='Concatenate Column Values':
                     root.destroy()
-                    concatenate_column_values_active()
+                    concatenate_column_values_active(message='standard')
 
                 elif choice=='Index and Match':
                     root.destroy()
@@ -457,8 +502,6 @@ def main_menu():
                     root.destroy()
                     main_menu()
         
-                return None
-
             # Create the list of options
             options_list = ['Compare Two Columns', 'Concatenate Column Values', 'Index and Match']
             
