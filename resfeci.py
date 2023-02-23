@@ -161,18 +161,27 @@ def concatenate_column_values_active(**message):
                 main_menu()
 
             def concatenate():
-                col1=options_list.index(value_col1.get())
+
+                # Failure if users does not select a column
+                try:
+                    col1=options_list.index(value_col1.get())
+                except:
+                    root.destroy()
+                    concatenate_column_values_active(message='unselected_column')
+
                 deliimter=delimiter_prompt.get()
+                print(f'delimiter: {deliimter}')
                 delimited_output_string=''
                 for i in df.itertuples(): # itertuples for speed; think of ways to vectorize...
-                    # if Col1 row value isn't header and isn't blank, then see if value is in Col2 numpy array, if so, highlight the cell.
-                    if delimited_output_string=='':
-                        delimited_output_string=str(i[col1+1]) + str(deliimter)
-                    else:
-                        delimited_output_string=delimited_output_string +  str(i[col1+1]) + str(deliimter)
+                    if str(i[col1+1])!='':
+                        if delimited_output_string=='':
+                            delimited_output_string=str(i[col1+1]) + str(deliimter)
+                        else:
+                            delimited_output_string=delimited_output_string +  str(i[col1+1]) + str(deliimter)
                         
-                # removing last character from string (non-used delimiter)        
-                delimited_output_string = delimited_output_string.rstrip(delimited_output_string[-1])
+                # removing last character from string (non-used delimiter)  
+                if deliimter!='':      
+                    delimited_output_string = delimited_output_string.rstrip(delimited_output_string[-1])
                 show_delimited_string(delimited_output_string)
 
             def show_delimited_string(delimited_output_string):
@@ -185,8 +194,11 @@ def concatenate_column_values_active(**message):
                 w = tk.Text(results, height=30, font=14, wrap='word')
                 w.insert(1.0, '\n' + delimited_output_string + '\n')
                 w.pack()
+                # The next two lines allow user-selectable text to be generated (in case they want to copy and paste)
                 w.configure(inactiveselectbackground=w.cget("selectbackground"))
                 w.configure(state="disabled")
+                copy_button = tk.Button(results, text='COPY TO CLIPBOARD', command=lambda: w.clipboard_append(delimited_output_string))
+                copy_button.pack(pady=10)
                 results.mainloop()
 
             
@@ -214,9 +226,15 @@ def concatenate_column_values_active(**message):
 
             # Create the list of options
             options_list = headers2
+      
+            for x in message.values():
+                if x == 'unselected_column':
+                    message_label=tk.Label(root, text = 'Please Select a Column')
+                else:
+                    message_label=tk.Label(root, text = '')
             
+            message_label.pack()
             
-           
             # Set the default value of the variable
             value_col1 = tk.StringVar(root)
             value_col1.set("  Select the Column to Concatenate  ")
@@ -225,11 +243,9 @@ def concatenate_column_values_active(**message):
 
             # Set the default value of the variable
             value_delimiter = tk.StringVar(root)
-            #value_delimiter.insert("  Enter Your Delimiter  ")
-            delimiter_label=tk.Label(root, text = 'Enter Your Delimiter')
+            delimiter_label=tk.Label(root, text = 'If Desired, Enter the Delimiter (Leave Blank for None)')
             delimiter_label.pack()
             delimiter_prompt= tk.Entry(root, textvariable=value_delimiter, justify='center')
-            #delimiter_prompt.insert(0, ' Enter Your Delimiter ')
             delimiter_prompt.pack(pady=10)
 
             submit_button = tk.Button(root, text='Submit', command=concatenate)
@@ -483,6 +499,14 @@ def main_menu():
 
         try:
 
+            # Create the list of main menu options
+            options_list = ['Compare Two Columns', 'Concatenate Column Values', 'Index and Match']
+            
+            root = tk.Tk()
+            root.title("Res Feci\t\t")
+            # center root window
+            root.tk.eval(f'tk::PlaceWindow {root._w} center')
+
             def main_menu_choice():
 
                 choice=selection.get()
@@ -493,7 +517,6 @@ def main_menu():
                 elif choice=='Concatenate Column Values':
                     root.destroy()
                     concatenate_column_values_active(message='standard')
-
                 elif choice=='Index and Match':
                     root.destroy()
                     index_match()
@@ -502,14 +525,6 @@ def main_menu():
                     root.destroy()
                     main_menu()
         
-            # Create the list of options
-            options_list = ['Compare Two Columns', 'Concatenate Column Values', 'Index and Match']
-            
-            root = tk.Tk()
-            root.title("Res Feci\t\t")
-            # center root window
-            root.tk.eval(f'tk::PlaceWindow {root._w} center')
-           
             # Set the default value of the variable
             selection = tk.StringVar(root)
             selection.set("  What Would You Like To Do?  ")
