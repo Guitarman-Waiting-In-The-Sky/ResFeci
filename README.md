@@ -12,7 +12,7 @@ is on Excel. The active worksheet is identified with pywin32; then, the used ran
 
 As of 2/20/23, I only have a few working (but not entirely tested) Excel features available (Compare Columns; Concatenate Column Row Values and Index & Match). 
 
-This all seems to work in a VERY small test run (n=2 !). In other words, this all DEFINITELY needs a lot more testing! Use as-is and ALWAYS REMEMBER, all macros 
+This all seems to work in a VERY small test runs. In other words, this all DEFINITELY needs a lot more testing! Use as-is and ALWAYS REMEMBER, all macros 
 will permanently change your Excel sheet data.  There is no undo! Be sure to save a copy of your report before you run any of this!!!
 
 NOTE: 2 External Libraries are Required to Be Installed for this Script: 
