@@ -10,28 +10,277 @@ import pandas as pd
 
 
 '''
+
 The ultimate goal here is to create Python-run alternatives to VBA macros that interface with Windows applications. While there are plenty of apps out there that already allow the user to
 interface with these; very few of these appear to offer the option to work with the active, in-focus application (i.e. the paths to files must either be hard-coded or selected 
 through a tkinter file selection type prompt).  The magic that allows this to happen is the pywin32 library (specifically, its COM component---win32com).
-
-As of 2/19/23, I only have a couple of working (but not entirely tested) Excel features available (Compare Columns and Concatenate Column Row Values). The active worksheet is identified with win32; then, the
-used range of the worksheet is read into a pandas dataframe to allow for various operations.  
-
-2/20/23: Converted Index and Match function into the "active worksheet" model.  It seems to work in a VERY small test run (n=2 :) )---will be tested more. 
 
 This all DEFINITELY needs a lot more testing! Use as-is!!! 
 
 REMEMBER, all macros are permanent (i.e. be sure to save a copy of your report before you run any of this!!!)
 
+TO-DO LIST
 
-'''
+ () Build an UNDO feature (need to save the state of the workbook/worksheet) prior to running functions (how>? VBA copy format/paste special?)
+ () Build a function to compare differences in worksheets (should be easy wtith Pandas....)
 
-#class Excel: # initially set up as a classed-library; but, this is really just a tkinter app at the moment.  Leave here just in case ever needed again.
+ '''
+
 
 # Working with the ALREADY-OPEN, active, Excel sheet to create an easier way to run Excel's Index and Match
 # TO-DO
+# () Finish building multi-column concatenate
 # () Test Function
 # () Currenly, strings can be read as numbers (i.e. 3 can become 3.0 when carried over)--look into retaining data type.
+        # This is a known limitation of using Pandas to reac Excel.  Text can become floats.  The solution is to specity the specific datatype of each column, but this requires knowing the column names....
+
+def main_menu():
+
+        '''
+        This is just the main options menu. Pretty basic and just serves to prompt the user for their desired action.
+        This is all running off of Tkinter because its part of the Python standard library and is cross-platform.
+        '''
+
+        try:
+
+            # Create the list of main menu options
+            options_list = ['Compare Two Columns', 'Concatenate SINGLE Column Values', 'Index and Match', 'Concatenate MULTIPLE Column Values']
+            
+            root = tk.Tk()
+            root.title("Res Feci\t\t")
+            # center root window
+            root.tk.eval(f'tk::PlaceWindow {root._w} center')
+
+            def main_menu_choice():
+
+                choice=selection.get()
+
+                if choice=='Compare Two Columns':
+                    root.destroy()
+                    compare_columns_active(message='standard')
+                elif choice=='Concatenate SINGLE Column Values':
+                    root.destroy()
+                    concatenate_column_values_active(message='standard')
+                elif choice=='Concatenate MULTIPLE Column Values':
+                    root.destroy()
+                    concatenate_multiple_column_values_active(message='standard')
+                elif choice=='Index and Match':
+                    root.destroy()
+                    index_match()
+                    
+                else:
+                    root.destroy()
+                    main_menu()
+        
+            # Set the default value of the variable
+            selection = tk.StringVar(root)
+            selection.set("  What Would You Like To Do?  ")
+            selection_prompt= tk.OptionMenu(root, selection, *options_list)
+            selection_prompt.pack(pady=10, padx=100)
+
+            submit_button = tk.Button(root, text='Submit', command=main_menu_choice)
+            submit_button.pack(pady=10)
+
+            root.mainloop()
+
+
+        except Exception as e:
+            print(e)
+
+
+'''
+
+This is the fly in the ointment. The problem is this...
+
+"Excel stores numbers differently that you may have them formatted display on the worksheet. Under normal circumstances, Excel stores numeric values 
+as "Double Precision Floating Point" numbers, or "Doubles" for short."
+
+    -from Rounding Errors In Excel by Chip Pearson, 27-Oct-1998.
+
+Long story short; this means that when Pandas reads the Excel.ActiveSheet as a dataframe, any #'s are read as float.  A displayed value of '3', will
+be read into Pandas as its floating point equivalent '3.0'.  For most operations, this is not ideal, and most users will want to preserved the "displayed"
+value, not the actual value.  This function reads a column and converts any floats that end in .0 into INT. 
+
+This can result is mixed datatypes in a single columns.  For example, if you have '3.14' and '5' in a columns, then, 3.14 will remain FLOAT while 5 will 
+be converted to INT.  NEED TO CONSIDER THE DOWNSIDE OF THIS.  AT THE MOMENT, THERE ARE NO DOWNSIDES BECAUSE I'M CONVERTING EVERYTHING INTO STRINGS ANYWAYS. 
+BUT, HEADS UP IF I CONSIDER MATHEMATICAL OPERATIONS.
+
+'''
+
+def create_df_from_activesheet_convert_float_to_int(active_sheet_object):
+
+    used_range_row_tuple=()
+    used_range_master_tuple=()
+
+    for x in active_sheet_object.UsedRange():
+        used_range_row_tuple=()
+        for y in x:
+            if str(type(y))=="<class 'float'>" and str(y)[-2:]=='.0':
+                y=str(y)
+                y=y[:-2]
+                y=int(y)
+                used_range_row_tuple=(*used_range_row_tuple, y)
+            else:
+                used_range_row_tuple=(*used_range_row_tuple, y)
+        used_range_master_tuple=(*used_range_master_tuple, used_range_row_tuple)
+    
+    df = pd.DataFrame(used_range_master_tuple)
+    df.columns=df.iloc[0] # df is created w/o headers, this coverts first row into a numpy.ndarray to be our headers
+    df = df.fillna('')   
+    return df
+
+
+'''
+
+The tkinter GUI presents user options in the form of a drop-down options menu.  Each option corresponds to an an Excel column header.  This reads the
+header values and converts those into the user-presented list for the options menu.
+
+'''
+
+def create_options_list_for_activesheet(df):
+
+    # Reading column headers into an initial list; this list is the headers "as-displayed" on the Excel sheet
+    displayed_headers=df.columns.tolist()
+  
+    # It is necessary to create a 2nd list because the 1st "headers" list may contain duplicately named columns which breaks my name-based indexing df system.
+    # My solution to this is to make sure all columns have unique index names by adding ("Column: COUNTER+ ") to the displayed headers.
+
+    options_list=[]
+
+    counter=1
+            
+    for x in displayed_headers:
+        options_list.append(str(x) + ' (Column: ' + str(counter) + ')')
+        counter=counter+1
+
+    # Adding one final column to the options menu, the is the column after the last-used column.  This is useful for asking the user if they want to place data into THIS column.
+    options_list.append('BLANK' + ' (Column: ' + str(counter) + ')')
+
+    # Returning options list!
+    return options_list
+
+
+
+def concatenate_multiple_column_values_active(**message):
+
+    root = tk.Tk()
+    root.title("Concatenate MULTIPLE Columns\t\t")
+    root.tk.eval(f'tk::PlaceWindow {root._w} center')
+
+    def return_main_menu():
+        root.destroy()
+        main_menu()
+
+    def concatenate_columns():
+
+        # Ensuring all pull-down menus have values---failure if nothing selected
+
+        try:
+            col1=options_list.index(value_col1.get())
+        except:
+            root.destroy()
+            concatenate_multiple_column_values_active(message='unselected_1st_column')
+
+        try:
+            col2=options_list.index(value_col2.get())
+        except:
+            root.destroy()
+            concatenate_multiple_column_values_active(message='unselected_column')
+
+        try:
+            output_col=options_list.index(value_output_col.get())
+        except:
+            root.destroy()
+            concatenate_multiple_column_values_active(message='unselected_output_column')
+
+        col1=options_list.index(value_col1.get())
+        col2=options_list.index(value_col2.get())
+
+        # User did not select col3 (this is caught by the error checking above)
+        try:
+            col3=options_list.index(value_col3.get())
+        except:
+            col3=''
+
+        output_col=options_list.index(value_output_col.get())
+
+        deliimter=str(delimiter_prompt.get())
+
+        row_counter=1
+
+        for i in df.itertuples(): # itertuples for speed; think of ways to vectorize...
+            if row_counter!=1:
+                if str(i[col1+1])=='' and str(i[col2+1])=='' and str(i[col3+1])=='':
+                    print('here!')
+                    activeSheet.Cells(row_counter, output_col+1).Value = ''
+                else:
+                    activeSheet.Cells(row_counter, output_col+1).Value = f'{str(i[col1+1])}{deliimter}{str(i[col2+1])}{deliimter}{str(i[col3+1])}' 
+            row_counter=row_counter+1
+                        
+        # # removing last character from string (non-used delimiter)  
+        # if deliimter!='':      
+        #     delimited_output_string = delimited_output_string.rstrip(delimited_output_string[-1])
+        # how_delimited_string(delimited_output_string)
+
+    excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application
+    activeSheet = excel.ActiveSheet
+    if activeSheet is None:
+        del excel
+        root.destroy()
+        error_window(message='excel_not_open')
+
+
+    
+    df = create_df_from_activesheet_convert_float_to_int(activeSheet)   
+    options_list = create_options_list_for_activesheet(df)
+
+    for x in message.values():
+        if x == 'unselected_column':
+            message_label=tk.Label(root, text = 'Please Ensure the 2nd Column is Selected')
+        elif x == 'unselected_1st_column':
+            message_label=tk.Label(root, text = 'Please Ensure the 1st Column Value is Selected')
+        elif x == 'unselected_output_column':
+            message_label=tk.Label(root, text = 'Please Be Sure to Select an Output Column!')
+        else:
+            message_label=tk.Label(root, text = '')
+            
+    message_label.pack()
+            
+    value_col1 = tk.StringVar(root)
+    value_col1.set("  Select the 1st Column to Join  ")
+    col_prompt= tk.OptionMenu(root, value_col1, *options_list)
+    col_prompt.pack(pady=10, padx=100)
+
+    value_col2 = tk.StringVar(root)
+    value_col2.set("  Select the Corresponding 2nd Column to Join  ")
+    col2_prompt= tk.OptionMenu(root, value_col2, *options_list)
+    col2_prompt.pack(pady=10, padx=100)
+
+    value_col3 = tk.StringVar(root)
+    value_col3.set("  Select the Corresponding 3nd Column to Join (leave as-is if NONE)  ")
+    col3_prompt= tk.OptionMenu(root, value_col3, *options_list)
+    col3_prompt.pack(pady=10, padx=100)
+
+    value_output_col = tk.StringVar(root)
+    value_output_col.set("  Select the Column to Hold Joined Data  ")
+    output_col_prompt= tk.OptionMenu(root, value_output_col, *options_list)
+    output_col_prompt.pack(pady=10, padx=100)
+
+    value_delimiter = tk.StringVar(root)
+    delimiter_label=tk.Label(root, text = 'If Desired, Enter the Delimiter (Leave Blank for None)')
+    delimiter_label.pack()
+    delimiter_prompt= tk.Entry(root, textvariable=value_delimiter, justify='center')
+    delimiter_prompt.pack(pady=10)
+
+    submit_button = tk.Button(root, text='Submit', command=concatenate_columns)
+    submit_button.pack(pady=10)
+
+    main_menu_button = tk.Button(root, text='Return to Main', command=return_main_menu)
+    main_menu_button.pack(pady=10)
+
+    root.mainloop()
+
+ 
 
 def index_match():
 
@@ -56,19 +305,20 @@ def index_match():
 
                     row_counter=1
                     for i in df.itertuples(): # iterating the chosen column
-                        df2 = df[df.iloc[:,col2]==str(i[col1+1])] # creating smaller dataframe where Col2 value = current iteration of Col1 value
-                        if len(df2)>0: # it a hit...
-                            corrsponding_values=df2.iloc[:,col3].unique()  #...create a unique list of values of the corresponding Col3 data
-                            corrsponding_values=corrsponding_values.tolist() #...converting to list
-                            output_string='' # converting string to list for readability on output
-                            for x in corrsponding_values:
-                                if output_string=='':
-                                    output_string=str(x) + '|'
-                                else:
-                                    output_string=output_string + str(x) + '|'
-                            output_string = output_string.rstrip(output_string[-1])
+                        if str(i[col1+1])!='':
+                            df2 = df[df.iloc[:,col2]==str(i[col1+1])] # creating smaller dataframe where Col2 value = current iteration of Col1 value
+                            if len(df2)>0: # it a hit...
+                                corrsponding_values=df2.iloc[:,col3].unique()  #...create a unique list of values of the corresponding Col3 data
+                                corrsponding_values=corrsponding_values.tolist() #...converting to list
+                                output_string='' # converting string to list for readability on output
+                                for x in corrsponding_values:
+                                    if output_string=='':
+                                        output_string=str(x) + '|'
+                                    else:
+                                        output_string=output_string + str(x) + '|'
+                                output_string = output_string.rstrip(output_string[-1])
 
-                            activeSheet.Cells(row_counter, col4+1).Value = output_string # writing that list to selected output column (col4)
+                                activeSheet.Cells(row_counter, col4+1).Value = output_string # writing that list to selected output column (col4)
                         row_counter=row_counter+1
                     excel.Visible = True # renders the app visible
                     
@@ -82,33 +332,9 @@ def index_match():
                     error_window(message='excel_not_open')
 
 
-                df = pd.DataFrame(activeSheet.UsedRange())    # Creates a pandas dataframe out of the used range of the active excel sheet.  
-                df.columns=df.iloc[0]                       # df is created w/o headers, this coverts first row into a numpy.ndarray to be our headers
-                df = df.fillna('')                          
-
-                headers=df.columns.tolist()
-                df.columns = df.columns.str.replace('.', '_')
-
-                counter=1
-
-                # Necessary to create a 2nd list because the 1st "headers" may contain duplicately named columns which breaks index()
-                # This ensures clears up confusion by adding ("Column: ")
-                headers2=[]
-                
-                for x in headers:
-                    headers2.append(str(x) + ' (Column: ' + str(counter) + ')')
-                    counter=counter+1
-
-                # Create the list of options
-                options_list = headers2
-        
-
-                header_dict={}
-                header_counter=1
-                for names in headers:
-                    header_dict.update({names : header_counter})
-                    header_counter=header_counter+1
-            
+                df = create_df_from_activesheet_convert_float_to_int(activeSheet)   
+                options_list = create_options_list_for_activesheet(df)
+                    
                 # Set the default value of the variable
                 value_col1 = tk.StringVar(root)
                 value_col1.set("  Step 1: Select the 1st Column to Be Compared  ")
@@ -169,19 +395,18 @@ def concatenate_column_values_active(**message):
                     root.destroy()
                     concatenate_column_values_active(message='unselected_column')
 
-                deliimter=delimiter_prompt.get()
-                print(f'delimiter: {deliimter}')
+                delimiter=delimiter_prompt.get()
                 delimited_output_string=''
                 for i in df.itertuples(): # itertuples for speed; think of ways to vectorize...
                     if str(i[col1+1])!='':
                         if delimited_output_string=='':
-                            delimited_output_string=str(i[col1+1]) + str(deliimter)
+                            delimited_output_string=str(i[col1+1]) + str(delimiter)
                         else:
-                            delimited_output_string=delimited_output_string +  str(i[col1+1]) + str(deliimter)
+                            delimited_output_string=delimited_output_string +  str(i[col1+1]) + str(delimiter)
                         
-                # removing last character from string (non-used delimiter)  
-                if deliimter!='':      
-                    delimited_output_string = delimited_output_string.rstrip(delimited_output_string[-1])
+                # removing last occurence of delimiter from string (if delimiter isn't blank)  
+                if delimiter!='':
+                    delimited_output_string = delimited_output_string[:-len(delimiter)]
                 show_delimited_string(delimited_output_string)
 
             def show_delimited_string(delimited_output_string):
@@ -209,23 +434,8 @@ def concatenate_column_values_active(**message):
                 root.destroy()
                 error_window(message='excel_not_open')
 
-            df = pd.DataFrame(activeSheet.UsedRange())    # Creates a pandas dataframe out of the used range of the active excel sheet.  
-            df.columns=df.iloc[0]                       # df is created w/o headers, this coverts first row into a numpy.ndarray to be our headers
-            df = df.fillna('')                          
-
-            headers=df.columns.tolist()
-            counter=1
-
-            # Necessary to create a 2nd list because the 1st "headers" may contain duplicately named columns which breaks index()
-            # This ensures clears up confusion by adding ("Column: ")
-            headers2=[]
-            
-            for x in headers:
-                headers2.append(str(x) + ' (Column: ' + str(counter) + ')')
-                counter=counter+1
-
-            # Create the list of options
-            options_list = headers2
+            df = create_df_from_activesheet_convert_float_to_int(activeSheet)   
+            options_list = create_options_list_for_activesheet(df)
       
             for x in message.values():
                 if x == 'unselected_column':
@@ -332,12 +542,7 @@ def compare_columns_active(**message):
 
         '''
         This compares two user-selected columns (from the ACTIVE) Excel Worksheet.  If there are any simliar values between the columns,
-        then, thhe cells are highlighted.
-        
-        The function EnsureDispatch() in win32.client.gencache allows you specify a prog_id and the gen_py cache wrapper objects are created at 
-        runtime if they don't already exist. This is useful if you don't care what version of COM server you use, allowing users to have various 
-        versions and still work with your code. In other words, it is the secret sauce which renders all this possible and grabs the in-foucs 
-        worksheet with win32
+        then, the cells are highlighted.
         '''
 
         try:
@@ -346,8 +551,7 @@ def compare_columns_active(**message):
             root.title("Compare Columns\t\t")
             # center root window
             root.tk.eval(f'tk::PlaceWindow {root._w} center')
-            #root.withdraw()
-            
+
             def return_main_menu():
                 root.destroy()
                 main_menu()
@@ -407,6 +611,16 @@ def compare_columns_active(**message):
                 root.destroy()
                 active_excel_job_complete(job='comparison')
 
+            # def undo(activesheet):
+            #     activeSheet.UsedRange.Copy
+
+            #     row_counter=1
+            #     for i in df.itertuples(): 
+            #         if i[col2+1] in col1_values and row_counter!=1 and i[col2+1]!='': 
+            #             activeSheet.Cells(row_counter, col2+1).Interior.ColorIndex = 37
+            #         row_counter=row_counter+1
+
+
 
             excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application     
         
@@ -430,21 +644,8 @@ def compare_columns_active(**message):
             # ********************************************************************************************************************
             
 
-            df = pd.DataFrame(activeSheet.UsedRange())    # Creates a pandas dataframe out of the used range of the active excel sheet.  
-            df.columns=df.iloc[0]                       # df is created w/o headers, this coverts first row into a numpy.ndarray to be our headers
-            df = df.fillna('')                          # replacing NaN with nothing because I dont like Nan (not to be confused with naan which is amazing)
-           
-            headers=df.columns.tolist()
-            counter=1
-            # Necessary to create a 2nd header list because the 1st "headers" may contain duplicately named columns which breaks index()
-            # This ensures every column is unique by adding ("Column: ")
-            headers2=[]
-            for x in headers:
-                headers2.append(str(x) + ' (Column: ' + str(counter) + ')')
-                counter=counter+1
-
-            # Create the list of user-presnted options(i.e. the column names with the headers2 suffix)
-            options_list = headers2
+            df = create_df_from_activesheet_convert_float_to_int(activeSheet)   
+            options_list = create_options_list_for_activesheet(df)
         
             compare_label=tk.Label(root)
 
@@ -478,6 +679,10 @@ def compare_columns_active(**message):
             main_menu_button = tk.Button(root, text='Return to Main', command=return_main_menu)
             main_menu_button.pack(pady=10)
 
+            # submit_button = tk.Button(root, text='Undo', command= lambda: undo(activeSheet.UsedRange()))
+            # submit_button.pack(pady=10)
+
+
             root.mainloop()
 
         except Exception as e:
@@ -490,56 +695,20 @@ def turn_excel_back_on(excel_object):
         excel_object.Application.Calculation = -4105 # to set xlCalculationManual
 
 
-def main_menu():
 
-        '''
-        This is just the main options menu. Pretty basic and just serves to prompt the user for their desired action.
-        This is all running off of Tkinter because its part of the Python standard library and is cross-platform.
-        '''
+'''
+SCRATCH NOTES
 
-        try:
+This may be useful someday (means of referencing the full path to the currently open workbook/worksheet):
 
-            # Create the list of main menu options
-            options_list = ['Compare Two Columns', 'Concatenate Column Values', 'Index and Match']
-            
-            root = tk.Tk()
-            root.title("Res Feci\t\t")
-            # center root window
-            root.tk.eval(f'tk::PlaceWindow {root._w} center')
-
-            def main_menu_choice():
-
-                choice=selection.get()
-
-                if choice=='Compare Two Columns':
-                    root.destroy()
-                    compare_columns_active(message='standard')
-                elif choice=='Concatenate Column Values':
-                    root.destroy()
-                    concatenate_column_values_active(message='standard')
-                elif choice=='Index and Match':
-                    root.destroy()
-                    index_match()
-                    
-                else:
-                    root.destroy()
-                    main_menu()
-        
-            # Set the default value of the variable
-            selection = tk.StringVar(root)
-            selection.set("  What Would You Like To Do?  ")
-            selection_prompt= tk.OptionMenu(root, selection, *options_list)
-            selection_prompt.pack(pady=10, padx=100)
-
-            submit_button = tk.Button(root, text='Submit', command=main_menu_choice)
-            submit_button.pack(pady=10)
-
-            root.mainloop()
+    # excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application   
+    # activeWorkbook = excel.ActiveWorkbook
+    # full_path=os.path.join(activeWorkbook.Path, activeWorkbook.Name)
+    # df = pd.read_excel(full_path, sheet_name=activeSheet.Name, dtype=str) 
 
 
-        except Exception as e:
-            print(e)
 
+'''
 
 if __name__=='__main__':
     main_menu()
