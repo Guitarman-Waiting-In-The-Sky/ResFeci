@@ -205,13 +205,10 @@ def concatenate_multiple_column_values_active(**message):
 
         row_counter=1
 
-        print(col3)
-        print(type(col3))
 
         for i in df.itertuples(): # itertuples for speed; think of ways to vectorize...
             if row_counter!=1:
                 if str(i[col1+1])=='' and str(i[col2+1])=='' and str(i[col3+1])=='': # all blank
-                    print('here!')
                     activeSheet.Cells(row_counter, output_col+1).Value = ''
                 else:
                     if col3==-1: # col3 not selected
