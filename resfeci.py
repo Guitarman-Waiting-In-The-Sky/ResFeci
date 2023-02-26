@@ -1,11 +1,5 @@
 import win32com.client as win32 # This allows active, in focus Excel sheet to be read
 import tkinter as tk
-from tkinter import filedialog
-from tkinter import messagebox  # Python 3
-from tkinter.simpledialog import askstring
-import os
-
-# Converts Excel Sheet into DataFrame
 import pandas as pd
 
 
@@ -34,6 +28,9 @@ TO-DO LIST
 # () Currenly, strings can be read as numbers (i.e. 3 can become 3.0 when carried over)--look into retaining data type.
         # This is a known limitation of using Pandas to reac Excel.  Text can become floats.  The solution is to specity the specific datatype of each column, but this requires knowing the column names....
 
+
+activeSheet_initial=''
+
 def main_menu():
 
         '''
@@ -57,7 +54,7 @@ def main_menu():
 
                 if choice=='Compare Two Columns':
                     root.destroy()
-                    compare_columns_active(message='standard')
+                    compare_columns_active(message='standard',message2='initial_run')
                 elif choice=='Concatenate SINGLE Column Values':
                     root.destroy()
                     concatenate_column_values_active(message='standard')
@@ -200,7 +197,7 @@ def concatenate_multiple_column_values_active(**message):
         try:
             col3=options_list.index(value_col3.get())
         except:
-            col3=''
+            col3=-1
 
         output_col=options_list.index(value_output_col.get())
 
@@ -208,19 +205,41 @@ def concatenate_multiple_column_values_active(**message):
 
         row_counter=1
 
+        print(col3)
+        print(type(col3))
+
         for i in df.itertuples(): # itertuples for speed; think of ways to vectorize...
             if row_counter!=1:
-                if str(i[col1+1])=='' and str(i[col2+1])=='' and str(i[col3+1])=='':
+                if str(i[col1+1])=='' and str(i[col2+1])=='' and str(i[col3+1])=='': # all blank
                     print('here!')
                     activeSheet.Cells(row_counter, output_col+1).Value = ''
                 else:
-                    activeSheet.Cells(row_counter, output_col+1).Value = f'{str(i[col1+1])}{deliimter}{str(i[col2+1])}{deliimter}{str(i[col3+1])}' 
+                    if col3==-1: # col3 not selected
+                        if str(i[col1+1])=='' and str(i[col2+1])=='':
+                            activeSheet.Cells(row_counter, output_col+1).Value = ''
+                        elif str(i[col1+1])!='' and str(i[col2+1])!='':
+                            activeSheet.Cells(row_counter, output_col+1).Value = f'{str(i[col1+1])}{deliimter}{str(i[col2+1])}'
+                        elif str(i[col1+1])!='' and str(i[col2+1])=='':
+                            activeSheet.Cells(row_counter, output_col+1).Value = f'{str(i[col1+1])}'
+                        else:
+                            activeSheet.Cells(row_counter, output_col+1).Value = f'{str(i[col2+1])}'
+                    else: # 3rd column selected
+                        if str(i[col1+1])!='' and str(i[col2+1])!='' and str(i[col3+1])!='':
+                            activeSheet.Cells(row_counter, output_col+1).Value = f'{str(i[col1+1])}{deliimter}{str(i[col2+1])}{deliimter}{str(i[col3+1])}'
+                        elif str(i[col1+1])!='' and str(i[col2+1])=='' and str(i[col3+1])!='':
+                            activeSheet.Cells(row_counter, output_col+1).Value = f'{str(i[col1+1])}{deliimter}{str(i[col3+1])}'
+                        elif str(i[col1+1])!='' and str(i[col2+1])!='' and str(i[col3+1])=='':
+                            activeSheet.Cells(row_counter, output_col+1).Value = f'{str(i[col1+1])}{deliimter}{str(i[col2+1])}'
+                        elif str(i[col1+1])=='' and str(i[col2+1])!='' and str(i[col3+1])!='':
+                            activeSheet.Cells(row_counter, output_col+1).Value = f'{str(i[col2+1])}{deliimter}{str(i[col3+1])}'
+                        elif str(i[col1+1])=='' and str(i[col2+1])=='' and str(i[col3+1])!='':
+                            activeSheet.Cells(row_counter, output_col+1).Value = f'{str(i[col3+1])}'
+                        elif str(i[col1+1])=='' and str(i[col2+1])!='' and str(i[col3+1])=='':
+                            activeSheet.Cells(row_counter, output_col+1).Value = f'{str(i[col2+1])}'
+                        elif str(i[col1+1])!='' and str(i[col2+1])=='' and str(i[col3+1])=='':
+                            activeSheet.Cells(row_counter, output_col+1).Value = f'{str(i[col1+1])}'
+
             row_counter=row_counter+1
-                        
-        # # removing last character from string (non-used delimiter)  
-        # if deliimter!='':      
-        #     delimited_output_string = delimited_output_string.rstrip(delimited_output_string[-1])
-        # how_delimited_string(delimited_output_string)
 
     excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application
     activeSheet = excel.ActiveSheet
@@ -228,8 +247,6 @@ def concatenate_multiple_column_values_active(**message):
         del excel
         root.destroy()
         error_window(message='excel_not_open')
-
-
     
     df = create_df_from_activesheet_convert_float_to_int(activeSheet)   
     options_list = create_options_list_for_activesheet(df)
@@ -484,7 +501,7 @@ def active_excel_job_complete(job):
             print(job)
             job_compete_window.destroy()
             if job=='comparison':
-                compare_columns_active()
+                compare_columns_active(message='subsequent_run')
 
         
 
@@ -538,7 +555,7 @@ def error_window(**message):
 
 
 
-def compare_columns_active(**message):
+def compare_columns_active(**kwargs):
 
         '''
         This compares two user-selected columns (from the ACTIVE) Excel Worksheet.  If there are any simliar values between the columns,
@@ -611,38 +628,30 @@ def compare_columns_active(**message):
                 root.destroy()
                 active_excel_job_complete(job='comparison')
 
-            # def undo(activesheet):
-            #     activeSheet.UsedRange.Copy
-
-            #     row_counter=1
-            #     for i in df.itertuples(): 
-            #         if i[col2+1] in col1_values and row_counter!=1 and i[col2+1]!='': 
-            #             activeSheet.Cells(row_counter, col2+1).Interior.ColorIndex = 37
-            #         row_counter=row_counter+1
-
+            # Planned feature to allow macros to be undone.  This seems to work; but cell interior color is not preserved (values only...) 
+            def undo(inital_active_sheet):
+                excel.ActiveSheet.UsedRange.Value = inital_active_sheet
+                inital_active_sheet=''
+                root.destroy()
+                return compare_columns_active(message='initial_run')
 
 
             excel = win32.gencache.EnsureDispatch('Excel.Application') # Opens application     
-        
 
-            # *************************************************************************************************************** 
-            # Most of these are for a planned future expansion, for now, I am just playing around with VBA functionality....
-            # Application.ActiveSheet: Returns an object that represents the active sheet (the sheet on top) in the active workbook
-            # or in the specified window or workbook. Returns Nothing if no sheet is active.
             activeSheet = excel.ActiveSheet
+
+            global activeSheet_initial # testing out UNDO feature; remove this is undo doesnt panout.
+            global initial_active_sheet # testing out UNDO feature; remove this is undo doesnt panout.
+
+            for x in kwargs.values():
+                if x =='initial_run':
+                    activeSheet_initial = excel.ActiveSheet.UsedRange()
+                    initial_active_sheet=activeSheet_initial
+
             if activeSheet is None:
                 del excel
                 root.destroy()
-                error_window(message='excel_not_open')
-
-            #activeWorkbook = excel.ActiveWorkbook
-            #full_path=os.path.join(activeWorkbook.Path, activeWorkbook.Name)
-            # print(activeSheet.Name) returns the name of the active sheet
-            #print(activeWorkbook.Name)
-            #print(full_path)
-            #print(activeSheet.Name)
-            # ********************************************************************************************************************
-            
+                error_window(message='excel_not_open')           
 
             df = create_df_from_activesheet_convert_float_to_int(activeSheet)   
             options_list = create_options_list_for_activesheet(df)
@@ -650,7 +659,7 @@ def compare_columns_active(**message):
             compare_label=tk.Label(root)
 
             # Message is the kwarg parameter of this function.
-            for x in message.values():
+            for x in kwargs.values():
                 if x == 'same_column':
                     compare_label=tk.Label(root, text = 'Please Select More Than 1 Column')
                 elif x == 'unselected_column':
@@ -679,9 +688,8 @@ def compare_columns_active(**message):
             main_menu_button = tk.Button(root, text='Return to Main', command=return_main_menu)
             main_menu_button.pack(pady=10)
 
-            # submit_button = tk.Button(root, text='Undo', command= lambda: undo(activeSheet.UsedRange()))
-            # submit_button.pack(pady=10)
-
+           # submit_button = tk.Button(root, text='Undo', command= lambda: undo(initial_active_sheet))
+           # submit_button.pack(pady=10)
 
             root.mainloop()
 
